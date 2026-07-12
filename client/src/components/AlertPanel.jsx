@@ -10,7 +10,7 @@ export default function AlertPanel({ currentAlert, alerts, taxonomy = [] }) {
       {currentAlert ? (
         <div className="shrink-0 max-h-[60%] overflow-y-auto">
           <VerdictCard
-            key={currentAlert.lineId + currentAlert.originalClaim}
+            key={`${currentAlert.lineId}-${currentAlert.verdict}`}
             alert={currentAlert}
             taxonomy={taxonomy}
             fresh

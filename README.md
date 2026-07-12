@@ -14,12 +14,13 @@ Real-time debate fact-checker and logical fallacy detector. When someone says so
 🎤 Browser mic → Socket.io (PCM16 @ 16 kHz) → Express server
    → Deepgram streaming WebSocket (live word-by-word transcription)
    → on each final utterance:
-       Claude call #1 — fast claim filter (no web search, structured JSON output)
-       Claude call #2 — fact-check + fallacy detect (web_search tool enabled)
+       call #1 — fast scan: checkable claim? logical fallacy? (no web search)
+                 ↳ fallacies alert INSTANTLY — they don't need the web
+       call #2 — web-search fact-check, only if the claim is checkable
    → Socket.io "alert:trigger" → 🔔 ding (Web Audio API) + sourced correction card
 ```
 
-The two-stage pipeline keeps costs down: call #2 (web search) only runs when call #1 says the sentence contains a verifiable claim or a fallacy. Alerts with confidence ≥ 0.7 fire the ding and card; lower-confidence flags show a muted ⚠️ chip in the transcript only.
+The two-stage pipeline keeps things fast and cheap: fallacy alerts fire within seconds straight from the scan, and the slower web-search call only runs for verifiable factual claims. Alerts with confidence ≥ 0.7 fire the ding and card; lower-confidence flags show a muted ⚠️ chip in the transcript only.
 
 ## Bring your own AI key
 
@@ -27,9 +28,9 @@ Each user connects **their own** AI account on the session screen — no AI key 
 
 | Provider | Models used | Web search for fact-checks |
 |---|---|---|
-| **Claude** (Anthropic) | `claude-sonnet-5` | ✅ `web_search` tool |
+| **Claude** (Anthropic) | `claude-haiku-4-5` (scan) + `claude-sonnet-5` (fact-check) | ✅ `web_search` tool |
 | **ChatGPT** (OpenAI) | `gpt-4o-mini` + `gpt-4o-mini-search-preview` | ✅ (falls back to no-search if unavailable) |
-| **Gemini** (Google) | `gemini-2.5-flash` | ✅ Google Search grounding (falls back if unavailable) |
+| **Gemini** (Google) | `gemini-flash-latest` | ✅ Google Search grounding (falls back if unavailable) |
 
 The key is kept in the browser's `localStorage` for convenience, sent to your DebateGuard server with `session:start`, held in memory for that session only, and never logged or written to disk.
 
@@ -38,7 +39,7 @@ The key is kept in the browser's `localStorage` for convenience, sent to your De
 - **Frontend:** React 18 + Vite + Tailwind CSS v4, `socket.io-client`, Web Audio API
 - **Backend:** Node.js + Express + Socket.io
 - **Speech-to-text:** Deepgram streaming (`nova-3`) — the transcript renders as one flowing paragraph, no speaker labels
-- **AI:** user-supplied key for Claude (official SDK), OpenAI, or Gemini — the spec's original `claude-sonnet-4-20250514` is deprecated; `claude-sonnet-5` is its documented replacement
+- **AI:** user-supplied key for Claude, OpenAI, or Gemini
 
 ## Setup
 
@@ -89,21 +90,6 @@ npm run build   # builds client/dist
 npm start       # Express serves the API, sockets, and the built client on :5000
 ```
 
-## Deploy (free, on Render)
-
-The backend holds a persistent Deepgram WebSocket, so it needs an always-running Node process — plain serverless (Vercel/Netlify functions) can't host it. The free-friendly split:
-
-**1. Server → Render Web Service (Free)**
-- New → **Web Service**, connect this repo.
-- Root Directory `server`, Build `npm install`, Start `npm start`.
-- Environment: add `DEEPGRAM_API_KEY`.
-- You'll get e.g. `https://debateguard-server.onrender.com`.
-
-**2. Client → Render Static Site (Free, never sleeps)**
-- New → **Static Site**, same repo.
-- Root Directory `client`, Build `npm install && npm run build`, Publish Directory `client/dist`.
-- Environment: `VITE_SERVER_URL=https://debateguard-server.onrender.com` (your server URL from step 1).
-
 ### The free tier sleeps — here's the built-in wake-up
 
 Render's free Web Service spins down after ~15 min idle, so the *first* visit after a quiet spell hits a cold backend. **No external uptime bot needed** — the frontend wakes it itself:
@@ -113,8 +99,6 @@ Render's free Web Service spins down after ~15 min idle, so the *first* visit af
 - Once the server answers, the banner flips to *"Ready to debate"* and the button unlocks.
 
 Because the **client** is a static site it's always instantly available to show that waiting state — only the backend sleeps, and opening the site is what wakes it.
-
-> Prefer no cold start at all? Point an [UptimeRobot](https://uptimerobot.com/) monitor at `<server-url>/api/health` every 10 minutes to keep the backend warm, or run the whole thing on an always-on host (Railway/Fly/a small VPS).
 
 ## Notes
 

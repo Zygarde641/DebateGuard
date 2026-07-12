@@ -79,12 +79,14 @@ export default function SessionRoom() {
       socket.on('claim:detected', ({ lineId }) => updateLine(lineId, { status: 'checking' }));
       socket.on('alert:trigger', (alert) => {
         if (alert.confidence >= 0.7) {
-          updateLine(alert.lineId, {
-            status: 'flagged',
-            verdict: alert.verdict,
-            hasFallacy: alert.fallacies.length > 0,
-            fallacyNames: alert.fallacies.map((f) => f.name || f.type),
-          });
+          // a line can get two alerts (instant fallacy, then fact-check) — merge, don't overwrite
+          const patch = { status: 'flagged' };
+          if (alert.verdict === 'FALSE' || alert.verdict === 'MISLEADING') patch.verdict = alert.verdict;
+          if (alert.fallacies.length > 0) {
+            patch.hasFallacy = true;
+            patch.fallacyNames = alert.fallacies.map((f) => f.name || f.type);
+          }
+          updateLine(alert.lineId, patch);
           enqueueAlert(alert);
         } else {
           // low confidence: muted chip in the transcript, no ding, no card

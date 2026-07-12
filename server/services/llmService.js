@@ -6,75 +6,99 @@ import Anthropic from '@anthropic-ai/sdk';
 
 export const PROVIDERS = ['claude', 'openai', 'gemini'];
 
-const CLAUDE_MODEL = 'claude-sonnet-5';
+// Latency-critical scan uses each provider's fastest model; the web-search
+// fact-check keeps the stronger model.
+const CLAUDE_SCAN_MODEL = 'claude-haiku-4-5';
+const CLAUDE_FACT_MODEL = 'claude-sonnet-5';
 const OPENAI_MODEL = 'gpt-4o-mini';
 const OPENAI_SEARCH_MODEL = 'gpt-4o-mini-search-preview';
-// "-latest" alias tracks the current GA flash model, so a deprecated point
-// release (e.g. gemini-2.5-flash getting gated) won't 404 us again.
 const GEMINI_MODEL = 'gemini-flash-latest';
 
-const FILTER_SYSTEM =
-  'You are a debate claim classifier. Given one spoken sentence from a live debate, decide whether it contains a verifiable factual claim and/or a logical fallacy. Opinions, questions, greetings and filler are not checkable.';
+const SCAN_TIMEOUT_MS = 15_000; // a scan slower than this is broken — fail fast
+const FACT_TIMEOUT_MS = 45_000;
 
-const FILTER_JSON_INSTRUCTIONS =
-  'Return ONLY a JSON object, no other text: {"isCheckable": boolean, "extractedClaim": string, "hasFallacy": boolean}. "extractedClaim" is the claim restated as a standalone checkable sentence, or "" if none.';
+const SCAN_SYSTEM =
+  'You are a real-time debate analyst. In one fast pass over a spoken sentence: (1) decide if it contains a verifiable factual claim (opinions, questions, greetings and filler are not checkable); (2) name any logical fallacies actually present, using standard names (Strawman, Ad Hominem, False Dichotomy, Slippery Slope, Cherry Picking, Whataboutism, Appeal to Emotion, ...). Be decisive and terse — one short explanation sentence per fallacy.';
 
-const FILTER_SCHEMA = {
+const SCAN_JSON_INSTRUCTIONS =
+  'Return ONLY a JSON object, no other text: {"isCheckable": boolean, "extractedClaim": string, "fallacies": [{"name": string, "explanation": string}], "confidence": number}. "extractedClaim" is the claim restated as a standalone checkable sentence, or "" if none. "fallacies" is [] if none. "confidence" (0-1) is your confidence in the fallacy judgment.';
+
+const SCAN_SCHEMA = {
   type: 'object',
   properties: {
     isCheckable: { type: 'boolean' },
     extractedClaim: { type: 'string' },
-    hasFallacy: { type: 'boolean' },
+    fallacies: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { name: { type: 'string' }, explanation: { type: 'string' } },
+        required: ['name', 'explanation'],
+        additionalProperties: false,
+      },
+    },
+    confidence: { type: 'number' },
   },
-  required: ['isCheckable', 'extractedClaim', 'hasFallacy'],
+  required: ['isCheckable', 'extractedClaim', 'fallacies', 'confidence'],
   additionalProperties: false,
 };
 
-const FACT_CHECK_SYSTEM = `You are a professional fact-checker and debate analyst. Verify the claim against reliable sources (use web search if available to you). Return ONLY a valid JSON object with no extra text, exactly this shape:
+const FACT_CHECK_SYSTEM = `You are a professional fact-checker on a live broadcast — speed matters. Verify the claim (use web search if available; at most 2 quick searches). Return ONLY a valid JSON object with no extra text, exactly this shape:
 {
   "verdict": "TRUE" | "FALSE" | "MISLEADING",
   "correction": string,
   "sourceUrl": string,
   "sourceName": string,
-  "confidence": number,
-  "fallacies": [{ "type": string, "name": string, "explanation": string }]
+  "confidence": number
 }
-Rules: "correction" is the accurate fact when the verdict is FALSE or MISLEADING, otherwise "". "confidence" is 0.0-1.0. Only list fallacies actually present, using standard names (Strawman, Ad Hominem, False Dichotomy, Cherry Picking, ...). Cite the single most authoritative source you found.`;
+Rules: "correction" is the accurate fact in 1-2 sentences when the verdict is FALSE or MISLEADING, otherwise "". "confidence" is 0.0-1.0. Cite the single most authoritative source you found.`;
 
 // ---------- public API ----------
 
-// Call #1 — fast, cheap claim filter. No web search.
-export async function filterClaim(llm, sentence) {
+// Stage 1 — fast scan: checkable claim? fallacies? No web search, fastest models,
+// so fallacy alerts can fire within seconds of the sentence being spoken.
+export async function scanUtterance(llm, sentence) {
   const user = `Sentence: "${sentence}"`;
   switch (llm.provider) {
     case 'claude': {
-      const resp = await claudeClient(llm).messages.create({
-        model: CLAUDE_MODEL,
-        max_tokens: 300,
-        thinking: { type: 'disabled' },
-        output_config: { effort: 'low', format: { type: 'json_schema', schema: FILTER_SCHEMA } },
-        system: FILTER_SYSTEM,
+      const resp = await claudeClient(llm, SCAN_TIMEOUT_MS).messages.create({
+        model: CLAUDE_SCAN_MODEL,
+        max_tokens: 500,
+        output_config: { format: { type: 'json_schema', schema: SCAN_SCHEMA } },
+        system: SCAN_SYSTEM,
         messages: [{ role: 'user', content: user }],
       });
       return extractJson(textOfClaude(resp));
     }
     case 'openai': {
-      const text = await openaiChat(llm.apiKey, {
-        model: OPENAI_MODEL,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: `${FILTER_SYSTEM}\n${FILTER_JSON_INSTRUCTIONS}` },
-          { role: 'user', content: user },
-        ],
-      });
+      const text = await openaiChat(
+        llm.apiKey,
+        {
+          model: OPENAI_MODEL,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: `${SCAN_SYSTEM}\n${SCAN_JSON_INSTRUCTIONS}` },
+            { role: 'user', content: user },
+          ],
+        },
+        SCAN_TIMEOUT_MS,
+      );
       return extractJson(text);
     }
     case 'gemini': {
-      const text = await geminiGenerate(llm.apiKey, {
-        systemInstruction: { parts: [{ text: `${FILTER_SYSTEM}\n${FILTER_JSON_INSTRUCTIONS}` }] },
-        contents: [{ role: 'user', parts: [{ text: user }] }],
-        generationConfig: { responseMimeType: 'application/json' },
-      });
+      const text = await geminiGenerate(
+        llm.apiKey,
+        {
+          systemInstruction: { parts: [{ text: `${SCAN_SYSTEM}\n${SCAN_JSON_INSTRUCTIONS}` }] },
+          contents: [{ role: 'user', parts: [{ text: user }] }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            // Gemini flash thinks by default, adding seconds — turn it off for the scan
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        },
+        SCAN_TIMEOUT_MS,
+      );
       return extractJson(text);
     }
     default:
@@ -82,9 +106,10 @@ export async function filterClaim(llm, sentence) {
   }
 }
 
-// Call #2 — fact-check + fallacy detection, web search where the provider supports it.
+// Stage 2 — fact-check with web search where the provider supports it.
+// Fallacies are already handled by the scan; this is verdict/correction only.
 export async function factCheck(llm, claim) {
-  const user = `Fact-check this debate statement and identify any logical fallacies: "${claim}"`;
+  const user = `Fact-check this debate statement: "${claim}"`;
   switch (llm.provider) {
     case 'claude':
       return extractJson(await claudeFactCheck(llm, user));
@@ -95,15 +120,15 @@ export async function factCheck(llm, claim) {
       ];
       let text;
       try {
-        text = await openaiChat(llm.apiKey, {
-          model: OPENAI_SEARCH_MODEL,
-          web_search_options: {},
-          messages,
-        });
+        text = await openaiChat(
+          llm.apiKey,
+          { model: OPENAI_SEARCH_MODEL, web_search_options: {}, messages },
+          FACT_TIMEOUT_MS,
+        );
       } catch (err) {
         if (isAuthError(err)) throw err;
         // search model unavailable on this account — fall back to plain model
-        text = await openaiChat(llm.apiKey, { model: OPENAI_MODEL, messages });
+        text = await openaiChat(llm.apiKey, { model: OPENAI_MODEL, messages }, FACT_TIMEOUT_MS);
       }
       return extractJson(text);
     }
@@ -111,13 +136,14 @@ export async function factCheck(llm, claim) {
       const body = {
         systemInstruction: { parts: [{ text: FACT_CHECK_SYSTEM }] },
         contents: [{ role: 'user', parts: [{ text: user }] }],
+        generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
       };
       let text;
       try {
-        text = await geminiGenerate(llm.apiKey, { ...body, tools: [{ google_search: {} }] });
+        text = await geminiGenerate(llm.apiKey, { ...body, tools: [{ google_search: {} }] }, FACT_TIMEOUT_MS);
       } catch (err) {
         if (isAuthError(err)) throw err;
-        text = await geminiGenerate(llm.apiKey, body); // grounding unavailable — answer without it
+        text = await geminiGenerate(llm.apiKey, body, FACT_TIMEOUT_MS); // grounding unavailable — answer without it
       }
       return extractJson(text);
     }
@@ -128,39 +154,44 @@ export async function factCheck(llm, claim) {
 
 export function friendlyError(err) {
   const msg = String(err?.message || err);
-  if (/401|403|invalid.?api.?key|unauthorized|permission|authentication/i.test(msg)) {
+  if (/401|403|invalid.?api.?key|api.?key.?not.?valid|API_KEY_INVALID|unauthorized|permission|authentication/i.test(msg)) {
     return 'Your API key was rejected by the provider. Check the key and try again.';
   }
   if (/429|rate.?limit|quota|resource.?exhausted/i.test(msg)) {
     return 'The AI provider is rate-limiting your key. Analysis will keep retrying.';
   }
+  if (/timeout|timed?.?out|abort/i.test(msg)) {
+    return 'The AI provider is responding slowly right now — that check was skipped.';
+  }
   return 'AI analysis failed — see the server log for details.';
 }
 
 export function isAuthError(err) {
-  return /401|403|invalid.?api.?key|unauthorized|authentication/i.test(String(err?.message || err));
+  return /401|403|invalid.?api.?key|api.?key.?not.?valid|API_KEY_INVALID|unauthorized|authentication/i.test(
+    String(err?.message || err),
+  );
 }
 
 // ---------- Claude ----------
 
-function claudeClient(llm) {
-  return new Anthropic({ apiKey: llm.apiKey });
+function claudeClient(llm, timeout) {
+  return new Anthropic({ apiKey: llm.apiKey, timeout, maxRetries: 1 });
 }
 
 async function claudeFactCheck(llm, user) {
-  const client = claudeClient(llm);
+  const client = claudeClient(llm, FACT_TIMEOUT_MS);
   const base = {
-    model: CLAUDE_MODEL,
-    max_tokens: 1500,
-    output_config: { effort: 'medium' },
-    tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 }],
+    model: CLAUDE_FACT_MODEL,
+    max_tokens: 1000,
+    output_config: { effort: 'low' },
+    tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 2 }],
     system: FACT_CHECK_SYSTEM,
   };
   let messages = [{ role: 'user', content: user }];
   let resp = await client.messages.create({ ...base, messages });
 
-  // the server-side search loop can pause mid-turn; resume up to 3 times
-  for (let i = 0; i < 3 && resp.stop_reason === 'pause_turn'; i++) {
+  // the server-side search loop can pause mid-turn; resume up to 2 times
+  for (let i = 0; i < 2 && resp.stop_reason === 'pause_turn'; i++) {
     messages = [...messages, { role: 'assistant', content: resp.content }];
     resp = await client.messages.create({ ...base, messages });
   }
@@ -173,11 +204,12 @@ function textOfClaude(resp) {
 
 // ---------- OpenAI ----------
 
-async function openaiChat(apiKey, body) {
+async function openaiChat(apiKey, body, timeoutMs) {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const data = await res.json();
@@ -186,16 +218,25 @@ async function openaiChat(apiKey, body) {
 
 // ---------- Gemini ----------
 
-async function geminiGenerate(apiKey, body) {
+async function geminiGenerate(apiKey, body, timeoutMs) {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
     },
   );
-  if (!res.ok) throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  if (!res.ok) {
+    const errText = (await res.text()).slice(0, 300);
+    // thinkingConfig support varies as the "-latest" alias moves — retry once without it
+    if (res.status === 400 && body.generationConfig?.thinkingConfig && /thinking/i.test(errText)) {
+      const { thinkingConfig, ...rest } = body.generationConfig;
+      return geminiGenerate(apiKey, { ...body, generationConfig: rest }, timeoutMs);
+    }
+    throw new Error(`Gemini ${res.status}: ${errText}`);
+  }
   const data = await res.json();
   return data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
 }
