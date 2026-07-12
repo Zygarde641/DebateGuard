@@ -7,6 +7,7 @@ import SessionTimer from '../components/SessionTimer.jsx';
 import ApiKeySetup from '../components/ApiKeySetup.jsx';
 import { useAudio } from '../hooks/useAudio.js';
 import { useSocket } from '../hooks/useSocket.js';
+import { SERVER_URL } from '../config';
 
 export default function SessionRoom() {
   const navigate = useNavigate();
@@ -29,7 +30,7 @@ export default function SessionRoom() {
 
   // fallacy definitions + examples for the alert cards
   useEffect(() => {
-    fetch('/api/fallacies')
+    fetch(`${SERVER_URL}/api/fallacies`)
       .then((r) => (r.ok ? r.json() : []))
       .then(setTaxonomy)
       .catch(() => {});

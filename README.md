@@ -89,6 +89,33 @@ npm run build   # builds client/dist
 npm start       # Express serves the API, sockets, and the built client on :5000
 ```
 
+## Deploy (free, on Render)
+
+The backend holds a persistent Deepgram WebSocket, so it needs an always-running Node process — plain serverless (Vercel/Netlify functions) can't host it. The free-friendly split:
+
+**1. Server → Render Web Service (Free)**
+- New → **Web Service**, connect this repo.
+- Root Directory `server`, Build `npm install`, Start `npm start`.
+- Environment: add `DEEPGRAM_API_KEY`.
+- You'll get e.g. `https://debateguard-server.onrender.com`.
+
+**2. Client → Render Static Site (Free, never sleeps)**
+- New → **Static Site**, same repo.
+- Root Directory `client`, Build `npm install && npm run build`, Publish Directory `client/dist`.
+- Environment: `VITE_SERVER_URL=https://debateguard-server.onrender.com` (your server URL from step 1).
+
+### The free tier sleeps — here's the built-in wake-up
+
+Render's free Web Service spins down after ~15 min idle, so the *first* visit after a quiet spell hits a cold backend. **No external uptime bot needed** — the frontend wakes it itself:
+
+- On page load the static client pings `/api/health` (retrying every 3s).
+- While the backend is cold it shows a banner: *"Waking the server… this first load can take up to a minute"*, and the **Start a Session** button is disabled.
+- Once the server answers, the banner flips to *"Ready to debate"* and the button unlocks.
+
+Because the **client** is a static site it's always instantly available to show that waiting state — only the backend sleeps, and opening the site is what wakes it.
+
+> Prefer no cold start at all? Point an [UptimeRobot](https://uptimerobot.com/) monitor at `<server-url>/api/health` every 10 minutes to keep the backend warm, or run the whole thing on an always-on host (Railway/Fly/a small VPS).
+
 ## Notes
 
 - The Deepgram key lives server-side only; the user's AI key lives in their browser + server memory for the session.

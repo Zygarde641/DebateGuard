@@ -1,12 +1,14 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { io } from 'socket.io-client';
+import { SERVER_URL } from '../config';
 
 // Lazy Socket.io connection, torn down on unmount.
 export function useSocket() {
   const socketRef = useRef(null);
 
   const getSocket = useCallback(() => {
-    socketRef.current ??= io(); // same origin — proxied to the Express server in dev
+    // SERVER_URL is '' locally (same origin, proxied) or the server URL in a split deploy
+    socketRef.current ??= io(SERVER_URL || undefined);
     return socketRef.current;
   }, []);
 

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useServerStatus } from '../serverStatus.jsx';
 
 const FEATURES = [
   {
@@ -19,6 +20,8 @@ const FEATURES = [
 ];
 
 export default function Landing() {
+  const { status } = useServerStatus();
+  const ready = status === 'ready';
   return (
     <div className="min-h-screen bg-bg">
       <section className="flex min-h-[85vh] flex-col items-center justify-center px-6 text-center">
@@ -31,12 +34,23 @@ export default function Landing() {
         <p className="mt-5 max-w-xl text-lg text-muted">
           Real-time AI fact-checking and fallacy detection for debates, panels, and arguments.
         </p>
-        <Link
-          to="/session"
-          className="mt-10 rounded-xl bg-primary px-8 py-4 text-lg font-semibold text-white shadow-lg shadow-primary/25 hover:bg-primary/90 transition-colors duration-300"
-        >
-          Start a Session
-        </Link>
+        {ready ? (
+          <Link
+            to="/session"
+            className="mt-10 rounded-xl bg-primary px-8 py-4 text-lg font-semibold text-white shadow-lg shadow-primary/25 hover:bg-primary/90 transition-colors duration-300"
+          >
+            Ready to debate — Start a Session
+          </Link>
+        ) : (
+          <button
+            disabled
+            aria-busy="true"
+            className="mt-10 flex items-center gap-3 rounded-xl bg-primary/40 px-8 py-4 text-lg font-semibold text-white/80 cursor-wait"
+          >
+            <span className="inline-block animate-spin">◔</span>
+            Waking the server… please wait
+          </button>
+        )}
         <Link to="/fallacies" className="mt-4 text-sm text-muted hover:text-primary transition-colors duration-300">
           Browse the fallacy guide →
         </Link>

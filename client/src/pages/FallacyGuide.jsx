@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { SERVER_URL } from '../config';
 
 const CATEGORY_STYLES = {
   Rhetoric: 'border-l-purple-500',
@@ -12,7 +13,7 @@ export default function FallacyGuide() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch('/api/fallacies')
+    fetch(`${SERVER_URL}/api/fallacies`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.statusText))))
       .then(setFallacies)
       .catch(() => setError('Could not load the fallacy guide — is the server running?'));
