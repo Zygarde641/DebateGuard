@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="560" viewBox="0 0 920 560" font-family="Inter, Segoe UI, sans-serif">
+  <rect width="920" height="560" rx="16" fill="#0D1117"/>
+  <text x="460" y="44" text-anchor="middle" fill="#E2E8F0" font-size="22" font-weight="800">DebateGuard AI — How It Works</text>
+  <text x="460" y="70" text-anchor="middle" fill="#718096" font-size="13">Stateless · no database · bring-your-own AI key</text>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#6C63FF"/>
+    </marker>
+    <style>
+      .box  { rx: 12; stroke-width: 1.5; }
+      .lbl  { fill: #E2E8F0; font-size: 15px; font-weight: 700; }
+      .sub  { fill: #718096; font-size: 11.5px; }
+      .flow { stroke: #6C63FF; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .note { fill: #718096; font-size: 11px; font-style: italic; }
+    </style>
+  </defs>
+
+  <!-- Browser -->
+  <rect x="40" y="120" width="230" height="150" rx="12" fill="#1A1A2E" stroke="#6C63FF"/>
+  <text x="60" y="150" class="lbl">🎙️ Browser (React)</text>
+  <text x="60" y="176" class="sub">• Mic → PCM16 @ 16kHz</text>
+  <text x="60" y="196" class="sub">• Live transcript feed</text>
+  <text x="60" y="216" class="sub">• 🔔 Web Audio ding + alert card</text>
+  <text x="60" y="236" class="sub">• User pastes their own AI key</text>
+  <text x="60" y="256" class="sub">  (Claude / ChatGPT / Gemini)</text>
+
+  <!-- Express server -->
+  <rect x="345" y="120" width="230" height="150" rx="12" fill="#1A1A2E" stroke="#10B981"/>
+  <text x="365" y="150" class="lbl">⚙️ Express + Socket.io</text>
+  <text x="365" y="176" class="sub">• Pipes audio to Deepgram</text>
+  <text x="365" y="196" class="sub">• Runs 2-stage AI pipeline</text>
+  <text x="365" y="216" class="sub">• In-memory only, per socket</text>
+  <text x="365" y="236" class="sub">• Holds DEEPGRAM_API_KEY</text>
+  <text x="365" y="256" class="sub">  (server-side, never sent to UI)</text>
+
+  <!-- Deepgram -->
+  <rect x="650" y="96" width="230" height="90" rx="12" fill="#1A1A2E" stroke="#F59E0B"/>
+  <text x="670" y="126" class="lbl">📡 Deepgram</text>
+  <text x="670" y="150" class="sub">Streaming speech-to-text</text>
+  <text x="670" y="170" class="sub">nova-3 · speaker diarization</text>
+
+  <!-- AI providers -->
+  <rect x="650" y="206" width="230" height="120" rx="12" fill="#1A1A2E" stroke="#F97316"/>
+  <text x="670" y="236" class="lbl">🧠 AI Provider</text>
+  <text x="670" y="260" class="sub">Call #1 — claim filter (cheap)</text>
+  <text x="670" y="280" class="sub">Call #2 — fact-check + fallacy</text>
+  <text x="670" y="300" class="sub">via web search</text>
+  <text x="670" y="318" class="note">Claude · ChatGPT · Gemini (user key)</text>
+
+  <!-- flows -->
+  <path class="flow" d="M270 178 L345 178"/>
+  <text x="308" y="168" text-anchor="middle" class="note">audio</text>
+  <path class="flow" d="M345 210 L270 210"/>
+  <text x="308" y="228" text-anchor="middle" class="note">transcript + alerts</text>
+
+  <path class="flow" d="M575 165 L650 150"/>
+  <text x="612" y="150" text-anchor="middle" class="note">audio</text>
+  <path class="flow" d="M650 172 L575 190"/>
+
+  <path class="flow" d="M575 232 L650 250"/>
+  <text x="612" y="248" text-anchor="middle" class="note">final line</text>
+  <path class="flow" d="M650 278 L575 250"/>
+
+  <!-- pipeline detail -->
+  <rect x="40" y="330" width="840" height="190" rx="12" fill="#141821" stroke="#2a2f3a"/>
+  <text x="60" y="360" fill="#E2E8F0" font-size="15" font-weight="700">The pipeline, per completed sentence</text>
+
+  <rect x="60" y="380" width="180" height="70" rx="10" fill="#1A1A2E" stroke="#6C63FF"/>
+  <text x="150" y="410" text-anchor="middle" class="lbl" font-size="13">1 · Transcribe</text>
+  <text x="150" y="430" text-anchor="middle" class="sub">Deepgram → text</text>
+
+  <rect x="290" y="380" width="180" height="70" rx="10" fill="#1A1A2E" stroke="#6C63FF"/>
+  <text x="380" y="404" text-anchor="middle" class="lbl" font-size="13">2 · Claim filter</text>
+  <text x="380" y="424" text-anchor="middle" class="sub">checkable claim or</text>
+  <text x="380" y="440" text-anchor="middle" class="sub">fallacy? (cheap call)</text>
+
+  <rect x="520" y="380" width="180" height="70" rx="10" fill="#1A1A2E" stroke="#6C63FF"/>
+  <text x="610" y="404" text-anchor="middle" class="lbl" font-size="13">3 · Fact-check</text>
+  <text x="610" y="424" text-anchor="middle" class="sub">web search →</text>
+  <text x="610" y="440" text-anchor="middle" class="sub">verdict + fallacies</text>
+
+  <rect x="750" y="380" width="110" height="70" rx="10" fill="#1A1A2E" stroke="#EF4444"/>
+  <text x="805" y="404" text-anchor="middle" class="lbl" font-size="13">4 · Alert</text>
+  <text x="805" y="424" text-anchor="middle" class="sub">🔔 ding +</text>
+  <text x="805" y="440" text-anchor="middle" class="sub">red highlight</text>
+
+  <path class="flow" d="M240 415 L290 415"/>
+  <path class="flow" d="M470 415 L520 415"/>
+  <path class="flow" d="M700 415 L750 415"/>
+
+  <text x="60" y="490" class="note">Confidence ≥ 0.7 → ding + sourced card. Below that → muted ⚠️ chip in the transcript, no ding.</text>
+  <text x="60" y="508" class="note">Call #2 only runs when Call #1 flags the sentence — keeps token cost down.</text>
+</svg>
