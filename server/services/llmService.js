@@ -61,7 +61,7 @@ export async function scanUtterance(llm, sentence) {
   const user = `Sentence: "${sentence}"`;
   switch (llm.provider) {
     case 'claude': {
-      const resp = await claudeClient(llm, SCAN_TIMEOUT_MS).messages.create({
+      const resp = await claudeCreate(claudeClient(llm, SCAN_TIMEOUT_MS), {
         model: CLAUDE_SCAN_MODEL,
         max_tokens: 500,
         output_config: { format: { type: 'json_schema', schema: SCAN_SCHEMA } },
@@ -157,6 +157,9 @@ export function friendlyError(err) {
   if (/401|403|invalid.?api.?key|api.?key.?not.?valid|API_KEY_INVALID|unauthorized|permission|authentication/i.test(msg)) {
     return 'Your API key was rejected by the provider. Check the key and try again.';
   }
+  if (isQuotaExhausted(err)) {
+    return 'This key’s daily free-tier quota is used up — it resets tomorrow. Switch provider or key to keep checking today.';
+  }
   if (/429|rate.?limit|quota|resource.?exhausted/i.test(msg)) {
     return 'The AI provider is rate-limiting your key. Analysis will keep retrying.';
   }
@@ -172,10 +175,27 @@ export function isAuthError(err) {
   );
 }
 
+// a spent per-DAY quota (e.g. Gemini free tier: 20 req/day) won't recover for hours —
+// retrying it is pure waste, so the pipeline stops instead
+export function isQuotaExhausted(err) {
+  const msg = String(err?.message || err);
+  return /429|RESOURCE_EXHAUSTED/i.test(msg) && /PerDay|per.?day|daily/i.test(msg);
+}
+
 // ---------- Claude ----------
 
 function claudeClient(llm, timeout) {
   return new Anthropic({ apiKey: llm.apiKey, timeout, maxRetries: 1 });
+}
+
+async function claudeCreate(client, params) {
+  await waitTurn();
+  try {
+    return await client.messages.create(params);
+  } catch (err) {
+    if (err?.status === 429) tripLimiter(retryDelayMs(err.headers, ''));
+    throw err;
+  }
 }
 
 async function claudeFactCheck(llm, user) {
@@ -188,12 +208,12 @@ async function claudeFactCheck(llm, user) {
     system: FACT_CHECK_SYSTEM,
   };
   let messages = [{ role: 'user', content: user }];
-  let resp = await client.messages.create({ ...base, messages });
+  let resp = await claudeCreate(client, { ...base, messages });
 
   // the server-side search loop can pause mid-turn; resume up to 2 times
   for (let i = 0; i < 2 && resp.stop_reason === 'pause_turn'; i++) {
     messages = [...messages, { role: 'assistant', content: resp.content }];
-    resp = await client.messages.create({ ...base, messages });
+    resp = await claudeCreate(client, { ...base, messages });
   }
   return textOfClaude(resp);
 }
@@ -205,13 +225,18 @@ function textOfClaude(resp) {
 // ---------- OpenAI ----------
 
 async function openaiChat(apiKey, body, timeoutMs) {
+  await waitTurn();
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs),
   });
-  if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    if (res.status === 429) tripLimiter(retryDelayMs(res.headers, errText));
+    throw new Error(`OpenAI ${res.status}: ${errText.slice(0, 300)}`);
+  }
   const data = await res.json();
   return data.choices?.[0]?.message?.content ?? '';
 }
@@ -219,6 +244,7 @@ async function openaiChat(apiKey, body, timeoutMs) {
 // ---------- Gemini ----------
 
 async function geminiGenerate(apiKey, body, timeoutMs) {
+  await waitTurn();
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
     {
@@ -229,16 +255,49 @@ async function geminiGenerate(apiKey, body, timeoutMs) {
     },
   );
   if (!res.ok) {
-    const errText = (await res.text()).slice(0, 300);
+    const errText = await res.text();
+    if (res.status === 429) tripLimiter(retryDelayMs(res.headers, errText));
     // thinkingConfig support varies as the "-latest" alias moves — retry once without it
     if (res.status === 400 && body.generationConfig?.thinkingConfig && /thinking/i.test(errText)) {
       const { thinkingConfig, ...rest } = body.generationConfig;
       return geminiGenerate(apiKey, { ...body, generationConfig: rest }, timeoutMs);
     }
-    throw new Error(`Gemini ${res.status}: ${errText}`);
+    throw new Error(`Gemini ${res.status}: ${errText.slice(0, 600)}`);
   }
   const data = await res.json();
   return data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
+}
+
+// ---------- adaptive rate limiting ----------
+// Full speed until a provider returns 429; then honor its requested cooldown and
+// space subsequent requests (~13s apart ≈ 4.6/min — under Gemini's 5 RPM free tier)
+// until it has been quiet for 5 minutes.
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const limiter = { nextAt: 0, minGapMs: 0, trippedAt: 0 };
+
+async function waitTurn() {
+  if (limiter.minGapMs && Date.now() - limiter.trippedAt > 5 * 60_000) limiter.minGapMs = 0;
+  const now = Date.now();
+  const start = Math.max(now, limiter.nextAt);
+  limiter.nextAt = start + limiter.minGapMs; // queued callers serialize with spacing
+  if (start > now) await sleep(start - now);
+}
+
+function tripLimiter(cooldownMs) {
+  limiter.trippedAt = Date.now();
+  limiter.minGapMs = Math.max(limiter.minGapMs, 13_000);
+  limiter.nextAt = Math.max(limiter.nextAt, Date.now() + cooldownMs);
+}
+
+// how long the provider asked us to back off (retry-after header, Gemini retryDelay, or 30s),
+// capped at 2 min so a daily-quota 429 can't park the queue for hours
+function retryDelayMs(headers, bodyText) {
+  const h = Number(headers?.get?.('retry-after'));
+  if (h > 0) return Math.min(h * 1000, 120_000);
+  const m = /retryDelay"?\s*:\s*"?([\d.]+)s/.exec(bodyText || '');
+  if (m) return Math.min(Math.ceil(parseFloat(m[1]) * 1000), 120_000);
+  return 30_000;
 }
 
 // ---------- shared ----------

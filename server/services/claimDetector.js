@@ -1,4 +1,4 @@
-import { scanUtterance, factCheck, friendlyError, isAuthError } from './llmService.js';
+import { scanUtterance, factCheck, friendlyError, isAuthError, isQuotaExhausted } from './llmService.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -47,8 +47,10 @@ export async function runPipeline({ text, lineId, llm }, emit) {
     try {
       result = await factCheck(llm, claim);
     } catch (err) {
-      if (isAuthError(err)) {
+      if (isAuthError(err) || isQuotaExhausted(err)) {
+        // bad key or spent daily quota — retrying is pure waste
         emit('error:llm', { message: friendlyError(err) });
+        emit('claim:cleared', { lineId, resolved: false });
         return;
       }
       console.error(`fact-check attempt ${attempt}/3 failed:`, err.message);

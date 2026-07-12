@@ -4,6 +4,8 @@ Real-time debate fact-checker and logical fallacy detector. When someone says so
 
 **No database. No auth. Everything is stateless** — React state on the frontend, in-memory maps on the Express server. End the session and it all resets.
 
+![DebateGuard catching a Strawman fallacy and a false claim live](docs/screenshot.png)
+
 ## Architecture
 
 ![DebateGuard architecture](docs/architecture.svg)
