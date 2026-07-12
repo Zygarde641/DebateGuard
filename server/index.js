@@ -29,6 +29,19 @@ const dist = path.resolve(__dirname, '../client/dist');
 if (fs.existsSync(dist)) {
   app.use(express.static(dist));
   app.get(/^\/(?!api|socket\.io).*/, (req, res) => res.sendFile(path.join(dist, 'index.html')));
+} else {
+  // backend-only deploy (e.g. Render): the website lives on the frontend host (Vercel)
+  app.get('/', (req, res) =>
+    res
+      .type('html')
+      .send(
+        '<div style="font-family:system-ui;max-width:34rem;margin:4rem auto;text-align:center;color:#e2e8f0;background:#0d1117;padding:2rem;border-radius:12px">' +
+          '<h1>🎙️ DebateGuard API is running</h1>' +
+          '<p style="color:#718096">This is the backend service. Open the app on your frontend host (e.g. your Vercel URL), not here.</p>' +
+          '<p><a style="color:#6c63ff" href="/api/health">/api/health</a></p>' +
+          '</div>',
+      ),
+  );
 }
 
 const server = http.createServer(app);

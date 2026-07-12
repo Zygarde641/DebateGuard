@@ -9,7 +9,9 @@ export const PROVIDERS = ['claude', 'openai', 'gemini'];
 const CLAUDE_MODEL = 'claude-sonnet-5';
 const OPENAI_MODEL = 'gpt-4o-mini';
 const OPENAI_SEARCH_MODEL = 'gpt-4o-mini-search-preview';
-const GEMINI_MODEL = 'gemini-2.5-flash';
+// "-latest" alias tracks the current GA flash model, so a deprecated point
+// release (e.g. gemini-2.5-flash getting gated) won't 404 us again.
+const GEMINI_MODEL = 'gemini-flash-latest';
 
 const FILTER_SYSTEM =
   'You are a debate claim classifier. Given one spoken sentence from a live debate, decide whether it contains a verifiable factual claim and/or a logical fallacy. Opinions, questions, greetings and filler are not checkable.';
