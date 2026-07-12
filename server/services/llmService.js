@@ -15,7 +15,7 @@ const OPENAI_SEARCH_MODEL = 'gpt-4o-mini-search-preview';
 const GEMINI_MODEL = 'gemini-flash-latest';
 
 const SCAN_TIMEOUT_MS = 15_000; // a scan slower than this is broken — fail fast
-const FACT_TIMEOUT_MS = 45_000;
+const FACT_TIMEOUT_MS = 60_000; // per attempt; the pipeline retries slow fact-checks in the background
 
 const SCAN_SYSTEM =
   'You are a real-time debate analyst. In one fast pass over a spoken sentence: (1) decide if it contains a verifiable factual claim (opinions, questions, greetings and filler are not checkable); (2) name any logical fallacies actually present, using standard names (Strawman, Ad Hominem, False Dichotomy, Slippery Slope, Cherry Picking, Whataboutism, Appeal to Emotion, ...). Be decisive and terse — one short explanation sentence per fallacy.';

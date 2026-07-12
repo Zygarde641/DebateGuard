@@ -1,4 +1,6 @@
-import { scanUtterance, factCheck, friendlyError } from './llmService.js';
+import { scanUtterance, factCheck, friendlyError, isAuthError } from './llmService.js';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Two-stage pipeline, tuned for latency:
 //   stage 1 (fast scan) detects fallacies itself and alerts IMMEDIATELY — no web search;
@@ -38,15 +40,25 @@ export async function runPipeline({ text, lineId, llm }, emit) {
   const claim = scan.extractedClaim || text;
   emit('claim:detected', { claimText: claim, lineId });
 
-  let result;
-  try {
-    result = await factCheck(llm, claim);
-  } catch (err) {
-    console.error('fact-check failed:', err.message);
-    emit('error:llm', { message: friendlyError(err) });
+  // keep the slow web search running in the background — retry instead of skipping,
+  // so the verdict card just arrives late rather than never
+  let result = null;
+  for (let attempt = 1; attempt <= 3 && !result; attempt++) {
+    try {
+      result = await factCheck(llm, claim);
+    } catch (err) {
+      if (isAuthError(err)) {
+        emit('error:llm', { message: friendlyError(err) });
+        return;
+      }
+      console.error(`fact-check attempt ${attempt}/3 failed:`, err.message);
+      if (attempt < 3) await sleep(2000 * attempt);
+    }
+  }
+  if (!result) {
+    emit('claim:cleared', { lineId, resolved: false }); // gave up — mark line ⚠️ unverified
     return;
   }
-  if (!result) return;
 
   if (result.verdict === 'FALSE' || result.verdict === 'MISLEADING') {
     emit('alert:trigger', {
@@ -59,5 +71,7 @@ export async function runPipeline({ text, lineId, llm }, emit) {
       originalClaim: claim,
       lineId,
     });
+  } else {
+    emit('claim:cleared', { lineId, resolved: true }); // claim checked out — drop the "checking…" chip
   }
 }

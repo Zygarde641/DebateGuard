@@ -81,7 +81,7 @@ Open http://localhost:5173, click **Start a Session**, pick your AI provider, pa
 | GET | `/api/fallacies` | The 21-fallacy taxonomy |
 | GET | `/api/health` | Health check |
 
-The real pipeline runs over Socket.io events (`audio:chunk`, `session:start/end` in; `transcript:partial/final`, `claim:detected`, `alert:trigger`, `error:stt` out).
+The real pipeline runs over Socket.io events (`audio:chunk`, `session:start/end` in; `transcript:partial/final`, `claim:detected`, `claim:cleared`, `alert:trigger`, `error:stt` out). Slow web fact-checks are retried in the background — the verdict card arrives late instead of never.
 
 ## Production
 

@@ -77,6 +77,9 @@ export default function SessionRoom() {
         setLines((prev) => [...prev, { ...line, status: null }]);
       });
       socket.on('claim:detected', ({ lineId }) => updateLine(lineId, { status: 'checking' }));
+      socket.on('claim:cleared', ({ lineId, resolved }) =>
+        updateLine(lineId, { status: resolved ? null : 'unverified' }),
+      );
       socket.on('alert:trigger', (alert) => {
         if (alert.confidence >= 0.7) {
           // a line can get two alerts (instant fallacy, then fact-check) — merge, don't overwrite
