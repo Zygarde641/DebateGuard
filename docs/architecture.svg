@@ -38,7 +38,7 @@
   <rect x="650" y="96" width="230" height="90" rx="12" fill="#1A1A2E" stroke="#F59E0B"/>
   <text x="670" y="126" class="lbl">📡 Deepgram</text>
   <text x="670" y="150" class="sub">Streaming speech-to-text</text>
-  <text x="670" y="170" class="sub">nova-3 · speaker diarization</text>
+  <text x="670" y="170" class="sub">nova-3 · live word-by-word</text>
 
   <!-- AI providers -->
   <rect x="650" y="206" width="230" height="120" rx="12" fill="#1A1A2E" stroke="#F97316"/>

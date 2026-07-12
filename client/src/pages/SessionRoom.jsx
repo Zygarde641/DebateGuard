@@ -163,9 +163,18 @@ export default function SessionRoom() {
   }, []);
 
   return (
-    <div className="flex h-screen flex-col bg-bg">
+    <div className="relative flex h-screen flex-col overflow-hidden bg-bg">
+      {/* ambient depth background */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+        <div className="animate-drift absolute -left-48 top-1/4 h-[28rem] w-[28rem] rounded-full bg-primary/10 blur-[120px]" />
+        <div
+          className="animate-drift absolute -right-40 bottom-0 h-[24rem] w-[24rem] rounded-full bg-true/5 blur-[120px]"
+          style={{ animationDelay: '-7s' }}
+        />
+      </div>
+
       {/* Top bar */}
-      <header className="flex shrink-0 items-center justify-between border-b border-white/5 px-5 py-3">
+      <header className="z-10 flex shrink-0 items-center justify-between border-b border-white/5 bg-bg/60 px-5 py-3 backdrop-blur-md">
         <Link to="/" className="flex items-center gap-2 font-bold">
           <span className={isListening ? 'animate-mic-pulse' : ''}>🎙️</span>
           <span>
@@ -217,17 +226,25 @@ export default function SessionRoom() {
       ) : (
         <>
           {/* Main two-column layout */}
-          <main className="flex min-h-0 flex-1 gap-5 p-5">
-            <section className="min-h-0 basis-[60%] rounded-xl bg-surface/40 border border-white/5 p-5">
+          <main className="z-10 flex min-h-0 flex-1 gap-5 p-5">
+            <section
+              className="animate-rise min-h-0 basis-[60%] rounded-xl border border-white/5 bg-surface/40 p-5 backdrop-blur-sm"
+              style={{ '--d': '0.05s' }}
+            >
               <TranscriptFeed lines={lines} partial={partial} listening={isListening} />
             </section>
-            <aside className="min-h-0 basis-[40%]" aria-live="polite" aria-label="Fact-check alerts">
+            <aside
+              className="animate-rise min-h-0 basis-[40%]"
+              style={{ '--d': '0.15s' }}
+              aria-live="polite"
+              aria-label="Fact-check alerts"
+            >
               <AlertPanel currentAlert={currentAlert} alerts={alerts} taxonomy={taxonomy} />
             </aside>
           </main>
 
           {/* Bottom bar */}
-          <footer className="shrink-0 border-t border-white/5 px-5 py-3">
+          <footer className="z-10 shrink-0 border-t border-white/5 bg-bg/60 px-5 py-3 backdrop-blur-md">
             <AudioVisualizer levelRef={levelRef} active={isListening} />
           </footer>
         </>

@@ -22,8 +22,11 @@ export default function ApiKeySetup({ onStart }) {
   };
 
   return (
-    <div className="flex flex-1 items-center justify-center p-6">
-      <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-surface border border-white/5 p-8">
+    <div className="z-10 flex flex-1 items-center justify-center p-6">
+      <form
+        onSubmit={submit}
+        className="animate-rise w-full max-w-md rounded-2xl border border-white/10 bg-surface/70 p-8 shadow-[0_30px_80px_-30px] shadow-primary/30 backdrop-blur"
+      >
         <h2 className="text-xl font-bold">Connect your AI</h2>
         <p className="mt-2 text-sm text-muted">
           DebateGuard uses <span className="text-body">your</span> AI account to fact-check. Pick a provider and paste
@@ -38,9 +41,9 @@ export default function ApiKeySetup({ onStart }) {
               role="radio"
               aria-checked={provider === p.id}
               onClick={() => setProvider(p.id)}
-              className={`rounded-xl border px-3 py-3 text-sm font-medium transition-colors duration-300 ${
+              className={`rounded-xl border px-3 py-3 text-sm font-medium transition-all duration-300 hover:-translate-y-0.5 ${
                 provider === p.id
-                  ? 'border-primary bg-primary/15 text-body'
+                  ? 'border-primary bg-primary/15 text-body shadow-lg shadow-primary/20'
                   : 'border-white/10 text-muted hover:border-white/25'
               }`}
             >

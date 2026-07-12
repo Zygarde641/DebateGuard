@@ -28,17 +28,14 @@ function startDeepgram(socket, llm, isRetry = false) {
   const session = { retried: isRetry, closedByUser: false, llm };
 
   session.dg = createLiveTranscription({
-    onTranscript: ({ text, isFinal, speaker }) => {
-      const label = `Speaker ${String.fromCharCode(65 + (speaker % 26))}`;
+    onTranscript: ({ text, isFinal }) => {
       if (!isFinal) {
-        socket.emit('transcript:partial', { text, speaker: label });
+        socket.emit('transcript:partial', { text });
         return;
       }
       const lineId = nextLineId++;
-      socket.emit('transcript:final', { text, speaker: label, timestamp: Date.now(), lineId });
-      runPipeline({ text, speaker: label, lineId, llm: session.llm }, (event, payload) =>
-        socket.emit(event, payload),
-      );
+      socket.emit('transcript:final', { text, timestamp: Date.now(), lineId });
+      runPipeline({ text, lineId, llm: session.llm }, (event, payload) => socket.emit(event, payload));
     },
     onError: (err) => console.error('deepgram error:', err?.message || err),
     onClose: () => {

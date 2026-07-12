@@ -15,7 +15,6 @@ export function createLiveTranscription({ onTranscript, onError, onClose }) {
     channels: 1,
     interim_results: true,
     smart_format: true,
-    diarize: true,
   });
 
   let open = false;
@@ -32,11 +31,7 @@ export function createLiveTranscription({ onTranscript, onError, onClose }) {
   connection.on(LiveTranscriptionEvents.Transcript, (data) => {
     const alt = data?.channel?.alternatives?.[0];
     if (!alt?.transcript) return;
-    onTranscript({
-      text: alt.transcript,
-      isFinal: Boolean(data.is_final),
-      speaker: alt.words?.[0]?.speaker ?? 0,
-    });
+    onTranscript({ text: alt.transcript, isFinal: Boolean(data.is_final) });
   });
 
   connection.on(LiveTranscriptionEvents.Error, (err) => onError?.(err));

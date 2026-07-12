@@ -19,13 +19,31 @@ body {
   font-family: var(--font-sans);
 }
 
+/* ---------- 2.5D motion system ---------- */
+
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
-@keyframes slide-in-right {
-  from { opacity: 0; transform: translateX(48px); }
-  to { opacity: 1; transform: none; }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(28px); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+@keyframes drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(4%, -6%, 0) scale(1.08); }
+}
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-14px); }
+}
+@keyframes ring-pulse {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+@keyframes card-in {
+  from { opacity: 0; transform: perspective(900px) translateX(56px) rotateY(-12deg); }
+  to { opacity: 1; transform: perspective(900px) translateX(0) rotateY(0); }
 }
 @keyframes alert-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
@@ -36,7 +54,33 @@ body {
   50% { transform: scale(1.08); opacity: 1; }
 }
 
-.animate-fade-in { animation: fade-in 300ms ease; }
-.animate-slide-in { animation: slide-in-right 300ms ease; }
+.animate-fade-in { animation: fade-in 500ms ease; }
+.animate-rise { opacity: 0; animation: rise 700ms cubic-bezier(0.22, 1, 0.36, 1) forwards; animation-delay: var(--d, 0s); }
+.animate-drift { animation: drift 16s ease-in-out infinite; will-change: transform; }
+.animate-float { animation: float-y 7s ease-in-out infinite; }
+.animate-card-in { animation: card-in 500ms cubic-bezier(0.22, 1, 0.36, 1); }
 .animate-alert-pulse { animation: alert-pulse 1s ease 1; }
 .animate-mic-pulse { animation: mic-pulse 2.4s ease-in-out infinite; }
+
+/* mouse-parallax layer: the container sets --px/--py (-1..1), each layer sets --plx (its depth in px) */
+.plx {
+  transform: translate3d(calc(var(--px, 0) * var(--plx, 0) * 1px), calc(var(--py, 0) * var(--plx, 0) * 1px), 0);
+  transition: transform 400ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 3D tilt cards (driven by useTilt) */
+.tilt {
+  transition: transform 250ms ease-out, box-shadow 250ms ease-out, border-color 250ms ease-out;
+  transform-style: preserve-3d;
+}
+
+/* accessibility — kill all motion for users who ask for it */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-rise { opacity: 1; }
+}

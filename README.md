@@ -12,7 +12,7 @@ Real-time debate fact-checker and logical fallacy detector. When someone says so
 
 ```
 🎤 Browser mic → Socket.io (PCM16 @ 16 kHz) → Express server
-   → Deepgram streaming WebSocket (live transcription + speaker diarization)
+   → Deepgram streaming WebSocket (live word-by-word transcription)
    → on each final utterance:
        Claude call #1 — fast claim filter (no web search, structured JSON output)
        Claude call #2 — fact-check + fallacy detect (web_search tool enabled)
@@ -37,7 +37,7 @@ The key is kept in the browser's `localStorage` for convenience, sent to your De
 
 - **Frontend:** React 18 + Vite + Tailwind CSS v4, `socket.io-client`, Web Audio API
 - **Backend:** Node.js + Express + Socket.io
-- **Speech-to-text:** Deepgram streaming (`nova-3`, diarize on)
+- **Speech-to-text:** Deepgram streaming (`nova-3`) — the transcript renders as one flowing paragraph, no speaker labels
 - **AI:** user-supplied key for Claude (official SDK), OpenAI, or Gemini — the spec's original `claude-sonnet-4-20250514` is deprecated; `claude-sonnet-5` is its documented replacement
 
 ## Setup

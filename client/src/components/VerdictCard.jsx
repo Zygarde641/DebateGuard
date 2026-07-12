@@ -27,15 +27,17 @@ export default function VerdictCard({ alert, taxonomy = [], fresh = false, compa
 
   return (
     <div
-      className={`rounded-xl bg-surface border border-white/5 p-4 ${
-        fresh ? 'animate-slide-in animate-alert-pulse' : ''
+      className={`rounded-xl border border-white/5 bg-surface/80 p-4 backdrop-blur ${
+        fresh ? 'animate-card-in animate-alert-pulse' : ''
       } ${compact ? 'p-3' : ''}`}
     >
       <div className="flex items-center justify-between gap-2">
         <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold ${badge.color}`}>
           {badge.emoji} {badge.label}
         </span>
-        <span className="text-xs text-muted">{alert.speaker}</span>
+        <span className="text-[11px] text-muted/70">
+          {Math.round((alert.confidence ?? 0) * 100)}% confident
+        </span>
       </div>
 
       <p className="mt-3 text-sm italic text-muted">“{alert.originalClaim}”</p>
@@ -81,9 +83,6 @@ export default function VerdictCard({ alert, taxonomy = [], fresh = false, compa
         </div>
       )}
 
-      {!compact && (
-        <p className="mt-3 text-[11px] text-muted/70">Confidence: {Math.round((alert.confidence ?? 0) * 100)}%</p>
-      )}
     </div>
   );
 }

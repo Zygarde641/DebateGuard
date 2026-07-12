@@ -49,10 +49,11 @@ export default function FallacyGuide() {
         {error && <p className="text-false">{error}</p>}
 
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {fallacies.map((f) => (
+          {fallacies.map((f, i) => (
             <div
               key={f.name}
-              className={`rounded-xl border-l-4 bg-surface p-5 border border-white/5 ${CATEGORY_STYLES[f.category] ?? ''}`}
+              className={`animate-rise rounded-xl border-l-4 border border-white/5 bg-surface/70 p-5 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-white/15 hover:shadow-[0_20px_50px_-20px] hover:shadow-primary/25 ${CATEGORY_STYLES[f.category] ?? ''}`}
+              style={{ '--d': `${Math.min(i * 0.05, 0.8)}s` }}
             >
               <div className="flex items-start justify-between gap-2">
                 <h3 className="font-semibold">{f.name}</h3>

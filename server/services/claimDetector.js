@@ -2,7 +2,7 @@ import { filterClaim, factCheck, friendlyError } from './llmService.js';
 
 // Two-stage pipeline: cheap classifier first, fact-check only when it flags.
 // The client applies the confidence >= 0.7 gate (ding + card vs. muted ⚠️ chip).
-export async function runPipeline({ text, speaker, lineId, llm }, emit) {
+export async function runPipeline({ text, lineId, llm }, emit) {
   if (!llm?.apiKey) return; // no key, transcript-only mode
   if (text.trim().split(/\s+/).length < 3) return; // filler — not worth a token
 
@@ -17,7 +17,7 @@ export async function runPipeline({ text, speaker, lineId, llm }, emit) {
   if (!filter || (!filter.isCheckable && !filter.hasFallacy)) return;
 
   const claim = filter.extractedClaim || text;
-  emit('claim:detected', { claimText: claim, speaker, lineId });
+  emit('claim:detected', { claimText: claim, lineId });
 
   let result;
   try {
@@ -43,7 +43,6 @@ export async function runPipeline({ text, speaker, lineId, llm }, emit) {
     confidence: typeof result.confidence === 'number' ? result.confidence : 0,
     fallacies: result.fallacies || [],
     originalClaim: claim,
-    speaker,
     lineId,
   });
 }

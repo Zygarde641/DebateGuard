@@ -1,4 +1,31 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, Fragment } from 'react';
+
+// One utterance = one inline span in the flowing paragraph.
+// fallacy → red highlight; FALSE/MISLEADING → red underline; checking → dotted underline.
+function Utterance({ line }) {
+  const falseClaim = line.verdict === 'FALSE' || line.verdict === 'MISLEADING';
+  let cls = 'animate-fade-in';
+  if (line.hasFallacy) {
+    cls += ' rounded bg-false/20 px-1 text-red-200 box-decoration-clone';
+  } else if (falseClaim) {
+    cls += ' underline decoration-false decoration-2 underline-offset-4';
+  } else if (line.status === 'checking') {
+    cls += ' underline decoration-dotted decoration-muted/60 underline-offset-4';
+  }
+  return (
+    <Fragment>
+      <span className={cls}>{line.text}</span>
+      {line.hasFallacy && line.fallacyNames?.length > 0 && (
+        <span className="mx-1.5 inline-block -translate-y-0.5 rounded border border-false/40 bg-false/15 px-1.5 py-0.5 align-middle text-[10px] font-semibold leading-none text-false">
+          ⚠ {line.fallacyNames.join(', ')}
+        </span>
+      )}
+      {line.status === 'unverified' && (
+        <span className="mx-1 align-middle text-[10px] text-muted">⚠️&thinsp;unverified</span>
+      )}{' '}
+    </Fragment>
+  );
+}
 
 export default function TranscriptFeed({ lines, partial, listening }) {
   const bottomRef = useRef(null);
@@ -9,53 +36,22 @@ export default function TranscriptFeed({ lines, partial, listening }) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted shrink-0">Live Transcript</h2>
+      <h2 className="mb-4 shrink-0 text-xs font-semibold uppercase tracking-widest text-muted">Live Transcript</h2>
       <div className="min-h-0 flex-1 overflow-y-auto pr-2">
         {lines.length === 0 && !partial && (
           <p className="text-sm text-muted">
             {listening ? 'Start talking — every word you say appears here as it’s heard.' : 'Waiting for the microphone…'}
           </p>
         )}
-        <div className="space-y-3">
-          {lines.map((line) => {
-            const falseClaim = line.verdict === 'FALSE' || line.verdict === 'MISLEADING';
-            return (
-              <div key={line.lineId} className={`animate-fade-in ${falseClaim ? 'border-l-2 border-false/70 pl-3 -ml-3.5' : ''}`}>
-                <span className="mr-2 text-xs font-semibold text-primary">[{line.speaker}]</span>
-                <span
-                  className={`text-sm leading-relaxed ${
-                    line.hasFallacy
-                      ? 'rounded bg-false/20 px-1 -mx-1 text-red-200 box-decoration-clone'
-                      : ''
-                  }`}
-                >
-                  {line.text}
-                </span>
-                {line.hasFallacy && line.fallacyNames?.length > 0 && (
-                  <span className="ml-2 text-[11px] font-semibold text-false">
-                    ⚠ {line.fallacyNames.join(', ')}
-                  </span>
-                )}
-                {line.status === 'checking' && (
-                  <span className="ml-2 animate-pulse text-[11px] text-muted">checking…</span>
-                )}
-                {line.status === 'unverified' && (
-                  <span className="ml-2 rounded bg-muted/15 px-1.5 py-0.5 text-[11px] text-muted">⚠️ unverified</span>
-                )}
-              </div>
-            );
-          })}
-          {partial && (
-            <div className="opacity-60">
-              <span className="mr-2 text-xs font-semibold text-primary">[{partial.speaker}]</span>
-              <span className="text-sm italic">{partial.text}</span>
-              <span className="ml-1 animate-pulse text-primary">▌</span>
-            </div>
+        <p className="text-[15px] leading-8 text-body/90">
+          {lines.map((line) => (
+            <Utterance key={line.lineId} line={line} />
+          ))}
+          {partial && <span className="italic text-muted">{partial.text}</span>}
+          {listening && (lines.length > 0 || partial) && (
+            <span className="ml-0.5 inline-block animate-pulse text-primary">▌</span>
           )}
-          {!partial && listening && lines.length > 0 && (
-            <p className="animate-pulse text-xs text-muted/60">🎧 listening…</p>
-          )}
-        </div>
+        </p>
         <div ref={bottomRef} />
       </div>
     </div>
